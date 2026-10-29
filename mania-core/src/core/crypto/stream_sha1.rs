@@ -49,7 +49,7 @@ impl StreamSha1Core {
         self.buffer
             .len64_padding_be(bit_len, |b| compress(&mut h, from_ref(&b.0)));
         let mut out = [0u8; 20];
-        for (chunk, v) in out.chunks_exact_mut(4).zip(h.iter()) {
+        for (chunk, v) in out.as_chunks_mut::<4>().0.iter_mut().zip(h.iter()) {
             chunk.copy_from_slice(&v.to_be_bytes());
         }
         out

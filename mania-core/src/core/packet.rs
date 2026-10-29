@@ -114,6 +114,14 @@ impl OidbPacket {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+pub struct SsoHead {
+    pub protocol: PacketType,
+    pub auth_flag: u8,
+    pub uin: u32,
+    len: usize,
+}
+
 #[derive(Clone)]
 pub struct SsoPacket {
     packet_type: PacketType,
@@ -298,9 +306,11 @@ impl SsoPacket {
             .build()
     }
 
-    pub fn parse(packet: Bytes, sess: &Session) -> Result<SsoPacket, PacketError> {
-        // Lagrange.Core.Internal.Packets.ServicePacker.Parse
-        let mut reader = PacketReader::new(packet);
+    pub fn parse_head(packet: &Bytes) -> Result<SsoHead, PacketError> {
+        if packet.len() < 10 {
+            return Err(PacketError::TruncatedHead(packet.len()));
+        }
+        let mut reader = PacketReader::new(packet.clone());
         let _length = reader.u32();
         let protocol: PacketType = reader
             .u32()
@@ -309,20 +319,36 @@ impl SsoPacket {
 
         let auth_flag = reader.u8();
         let _flag = reader.u8();
-        let uin = reader.section(|p| p.string());
+        let uin = reader
+            .try_section(|p| p.string())
+            .ok_or(PacketError::TruncatedHead(packet.len()))?;
         let uin = uin.parse().map_err(|_| PacketError::InvalidUin(uin))?;
-        if uin != **sess.key_store.uin.load() && protocol == PacketType::T12 {
-            return Err(PacketError::UinMismatch(**sess.key_store.uin.load(), uin));
+        Ok(SsoHead {
+            protocol,
+            auth_flag,
+            uin,
+            len: packet.len() - reader.remaining(),
+        })
+    }
+
+    pub fn parse(packet: Bytes, sess: &Session) -> Result<SsoPacket, PacketError> {
+        // Lagrange.Core.Internal.Packets.ServicePacker.Parse
+        let head = Self::parse_head(&packet)?;
+        if head.uin != **sess.key_store.uin.load() && head.protocol == PacketType::T12 {
+            return Err(PacketError::UinMismatch(
+                **sess.key_store.uin.load(),
+                head.uin,
+            ));
         }
 
-        let body = reader.bytes();
+        let body = packet.slice(head.len..);
 
-        let body = match auth_flag {
+        let body = match head.auth_flag {
             0 => body,
             1 => tea::tea_decrypt(&body, sess.key_store.wt_session.d2_key.load().as_ref()).into(),
             2 => tea::tea_decrypt(&body, &[0u8; 16]).into(),
             _ => {
-                return Err(PacketError::UnknownAuthFlag(auth_flag));
+                return Err(PacketError::UnknownAuthFlag(head.auth_flag));
             }
         };
 
@@ -371,6 +397,8 @@ impl SsoPacket {
 
 #[derive(Debug, Error)]
 pub enum PacketError {
+    #[error("truncated raw SsoPacket head, packet length: {0}")]
+    TruncatedHead(usize),
     #[error("unknown raw SsoPacket type: {0}")]
     UnknownSsoPacketType(u32),
     #[error("unknown raw SsoPacket auth flag: {0}")]
@@ -520,11 +548,11 @@ impl PacketBuilder {
 
         match prefix_length {
             1 => this.buffer[ori_length - prefix_length] = length as u8,
-            2 => byteorder::BigEndian::write_u16(
+            2 => BigEndian::write_u16(
                 &mut this.buffer[ori_length - prefix_length..],
                 length as u16,
             ),
-            4 => byteorder::BigEndian::write_u32(
+            4 => BigEndian::write_u32(
                 &mut this.buffer[ori_length - prefix_length..],
                 length as u32,
             ),
@@ -553,7 +581,7 @@ impl PacketBuilder {
         let mut this = f(this);
 
         let len = (this.buffer.len() - start) as isize - 4 + N;
-        byteorder::BigEndian::write_u32(&mut this.buffer[start..], len as u32);
+        BigEndian::write_u32(&mut this.buffer[start..], len as u32);
 
         this
     }
@@ -580,7 +608,7 @@ impl PacketBuilder {
         if len > u16::MAX as isize {
             panic!("section too long");
         }
-        byteorder::BigEndian::write_u16(&mut this.buffer[start..], len as u16);
+        BigEndian::write_u16(&mut this.buffer[start..], len as u16);
 
         this
     }
@@ -643,6 +671,10 @@ impl PacketReader {
         self.reader.advance(n);
     }
 
+    pub fn remaining(&self) -> usize {
+        self.reader.len()
+    }
+
     pub fn read_packet(&mut self, count: usize) -> BinaryPacket {
         BinaryPacket(self.reader.split_to(count))
     }
@@ -664,6 +696,13 @@ impl PacketReader {
 
     pub fn section<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
         self.section_with_addition::<T, 4>(f)
+    }
+
+    pub fn try_section<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> Option<T> {
+        let n = self.reader.get(..4).map(|mut b| b.get_u32() as usize)?;
+        (4..=self.reader.len())
+            .contains(&n)
+            .then(|| self.section(f))
     }
 
     pub fn section_with_addition<T, const N: isize>(

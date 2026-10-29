@@ -116,11 +116,10 @@ impl BusinessHandle {
             req: ImageGroupUploadArgs {
                 group_uin,
                 size: image.size,
-                name: image.file_path.clone().unwrap_or_else(|| format!(
-                    "{}.{}",
-                    &sha1.hex(),
-                    iv.0
-                )),
+                name: image
+                    .file_path
+                    .clone()
+                    .unwrap_or_else(|| format!("{}.{}", sha1.hex(), iv.0)),
                 md5,
                 sha1,
                 pic_type: iv.0 as u32,
@@ -210,11 +209,10 @@ impl BusinessHandle {
             req: ImageC2CUploadArgs {
                 uid: target_uid.to_string(),
                 size: image.size,
-                name: image.file_path.clone().unwrap_or_else(|| format!(
-                    "{}.{}",
-                    &sha1.hex(),
-                    iv.0
-                )),
+                name: image
+                    .file_path
+                    .clone()
+                    .unwrap_or_else(|| format!("{}.{}", sha1.hex(), iv.0)),
                 md5,
                 sha1,
                 pic_type: iv.0 as u32,
@@ -353,14 +351,14 @@ impl BusinessHandle {
                 video_name: video
                     .video_path
                     .clone()
-                    .unwrap_or_else(|| { format!("{}.mp4", &file_sha1.hex()) }),
+                    .unwrap_or_else(|| { format!("{}.mp4", file_sha1.hex()) }),
                 video_md5: file_md5,
                 video_sha1: file_sha1,
                 thumb_size: video.video_thumb_size as u32,
                 thumb_name: video
                     .video_thumb_path
                     .clone()
-                    .unwrap_or_else(|| { format!("{}.jpg", &thumb_sha1.hex()) }),
+                    .unwrap_or_else(|| { format!("{}.jpg", thumb_sha1.hex()) }),
                 thumb_md5,
                 thumb_sha1,
                 thumb_width: video.video_thumb_width as u32,
@@ -511,14 +509,14 @@ impl BusinessHandle {
                 video_name: video
                     .video_path
                     .clone()
-                    .unwrap_or_else(|| { format!("{}.mp4", &file_sha1.hex()) }),
+                    .unwrap_or_else(|| { format!("{}.mp4", file_sha1.hex()) }),
                 video_md5: file_md5,
                 video_sha1: file_sha1,
                 thumb_size: video.video_thumb_size as u32,
                 thumb_name: video
                     .video_thumb_path
                     .clone()
-                    .unwrap_or_else(|| { format!("{}.jpg", &thumb_sha1.hex()) }),
+                    .unwrap_or_else(|| { format!("{}.jpg", thumb_sha1.hex()) }),
                 thumb_md5,
                 thumb_sha1,
                 thumb_width: video.video_thumb_width as u32,
@@ -747,7 +745,7 @@ impl BusinessHandle {
                 name: record
                     .file_path
                     .clone()
-                    .unwrap_or_else(|| format!("{}.amr", &md5.hex())),
+                    .unwrap_or_else(|| format!("{}.amr", md5.hex())),
                 md5,
                 sha1,
             },
@@ -839,7 +837,7 @@ impl BusinessHandle {
                 name: record
                     .file_path
                     .clone()
-                    .unwrap_or_else(|| format!("{}.mp3", &sha1.hex())),
+                    .unwrap_or_else(|| format!("{}.mp3", sha1.hex())),
                 md5,
                 sha1,
             }

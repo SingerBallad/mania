@@ -2,7 +2,6 @@ use mania::event::group::GroupEvent;
 use mania::message::builder::MessageChainBuilder;
 use mania::{Client, ClientConfig, DeviceInfo, KeyStore};
 use std::fs;
-use std::io::stdout;
 use tracing_subscriber::prelude::*;
 use uuid::Uuid;
 
@@ -20,6 +19,7 @@ async fn main() {
                 .init();
             tracing::info!("tokio-tracing initialized.");
         } else {
+            use std::io::stdout;
             use tracing_subscriber::{fmt, EnvFilter};
             // let file_appender = RollingFileAppender::new(Rotation::HOURLY, "./logs", "mania.log");
             let fmt_layer = fmt::Layer::default()
